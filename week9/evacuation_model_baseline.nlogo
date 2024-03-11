@@ -1,234 +1,342 @@
 globals
 [
-  turtle_pop ; number of turtles
-  max_food_capacity ; max food capacity each patch can hold
-  init_energy_level ; initial energy level for each turtle
-  ; max_food_consumed ; max food edible by turtle per tick, defined by slider
-  ; grow_back_rate ; the amount each patch grows back
-  ; offspring_threshold ; the ratio of energy level to give birth; # of times of init_energy_level
+  num-publics
+  num-staffs
+]
+
+
+breed [publics public]
+breed [staffs staff]
+
+
+turtles-own
+[
+  next-patch
 ]
 
 
 patches-own
 [
-  food_capacity ; capacity of food for each patch
-  food_amount ; the amount of food each patch currently has
-]
-
-
-turtles-own
-[
-  energy_level
-  energy_consumption
+  staffonly?
 ]
 
 
 to setup
 
   ca
-  ; set global variables
-  init_global
-
-  ;set up patches and turtles
-  setup_patches
-  setup_turtles
-
-  ; edit visualisations
-  visualise
-
-  ; setup plot
-  setup_plot
-
   reset-ticks
+
+  set-globals
+  setup-patches
+
+  draw-building
+  label-rooms
+  set-staff-area
+
+  create-agents
 
 end
 
-to go ; observer
 
-  ; grow back
-  grow_back
+to go
 
-  ; turtles consume food
-  consume_food
-
-  ; move turtles
-  move_turtles
-
-  ; visualise
-  visualise
-
-  ; plot
-  plotting
+  move
 
   tick
 
 end
 
-; initialise global variables
-to init_global ; observer
-  set turtle_pop 100
-  set max_food_capacity 100
-  set init_energy_level 100
+
+to set-globals
+
+  set num-publics 200
+  set num-staffs 25
+
 end
 
-; setup patches
-to setup_patches ; observer
+
+to setup-patches
+
   ask patches
   [
-    ; randomly allocate food
-    ; set food_capacity (random max_food_capacity)
-
-    ; hills of food
-    let food1 max_food_capacity - (distancexy 10 10) * 5
-    let food2 (max_food_capacity - (distancexy 25 30) * 5) * 0.6
-    set food_capacity max (list food1 food2 0)
-
-    set food_amount food_capacity
+    set staffonly? false
   ]
+
 end
 
-; setup turtles
-to setup_turtles
-  crt turtle_pop
+
+to create-agents
+
+  create-publics num-publics
   [
-    setxy random-pxcor random-pycor
-    set color red
-    set size 2
-    set shape "turtle"
-    set heading 45
-    set energy_level init_energy_level
-    set energy_consumption ((random 9) + 2)
+    set color pink
+    move-to one-of patches with [staffonly? = false and pcolor = black and any? turtles-here = false]
   ]
-end
 
-
-; tweak the visualisations
-to visualise ; observer
-  ; color patches
-  ask patches
+  create-staffs num-staffs
   [
-    set pcolor scale-color gray food_amount (- max_food_capacity) (max_food_capacity)
+    set color cyan
+    move-to one-of patches with [pcolor = black and any? turtles-here = false]
   ]
 
 end
 
-; grow back
-to grow_back
-  ask patches
-  [
-    if (food_amount < food_capacity)
-    [
-      set food_amount (food_amount + grow_back_rate)
-    ]
-  ]
+
+to set-staff-area
+
+  ask patches with [pycor > 12]
+  [set staffonly? true]
+
+  ask patches with [pxcor > 14]
+  [set staffonly? true]
+
+  ask patches with [(pxcor > 2) and (pycor < -9)]
+  [set staffonly? true]
+
+  ask patches with [(pxcor < -10) and (pycor > 10)]
+  [set staffonly? true]
+
+  ask patches with [(pxcor > -7) and (pycor > 8)]
+  [set staffonly? true]
+
 end
 
-; consume food
-to consume_food ; observer
-  ask turtles
-  [
-    ; calculate food consumed
-    let food_eaten 0
-    ifelse (([food_amount] of patch-here) < max_food_consumed)
-    [
-      set food_eaten ([food_amount] of patch-here)
-    ]
-    [
-      set food_eaten max_food_consumed
-    ]
 
-    ; add energy level
-    set energy_level (energy_level + food_eaten)
-
-    ; reduce food from patch
-    ask patch-here
-    [
-      set food_amount (food_amount - ([food_eaten] of myself))
-    ]
-
-  ]
-end
-
-; move turtles
-to move_turtles
+to move
 
   ask turtles
   [
-    ; give birth to offspring with high value of energy
-    if energy_level > (init_energy_level * offspring_threshold)
+    ifelse breed = publics
+    [set next-patch one-of neighbors4 with [pcolor = black and staffonly? = false and (any? turtles-here = false)]]
+    [set next-patch one-of neighbors4 with [pcolor = black and (any? turtles-here = false)]]
+    carefully
     [
-      ; reduce energy level
-      set energy_level (energy_level - init_energy_level)
-
-      ; hatch turtle
-      hatch 1
-      [
-        set color red
-        set size 2
-        set shape "turtle"
-        set heading 45
-        set energy_level init_energy_level
-        set energy_consumption ([energy_consumption] of myself)
-      ]
+    face next-patch
+    move-to next-patch
     ]
-
-    ; reduce energy level
-    set energy_level (energy_level - energy_consumption)
-
-    ; die if energy_level is low
-    if (energy_level <= 0)
-    [ die ]
-
-    ; move to the neighbouring patch with maximum food
-    move-to (max-one-of (patch-set neighbors) [food_amount])
+    []
   ]
 
 end
 
-; initialise plot
-to setup_plot
-  set-current-plot "Number of Turtles"
-  set-plot-y-range 0 100
-  set-histogram-num-bars 6
+
+to label-rooms
+
+  ask patch -15 2 [set plabel "Bar"]
+  ask patch -7 3 [set plabel "Toilets"]
+  ask patch -15 17 [set plabel "Kitchen"]
+  ask patch 0 15 [set plabel "Dressing Rooms"]
+  ask patch 20 15 [set plabel "Toilets"]
+  ask patch 12 19 [set plabel "Green Room"]
+  ask patch 5 2 [set plabel "Auditorium"]
+  ask patch -7 -17 [set plabel "Entrance Hall"]
+  ask patch 6 -16 [set plabel "Ticket"]
+  ask patch 6 -17 [set plabel "Office"]
+  ask patch 10 -16 [set plabel "Staff"]
+  ask patch 10 -17 [set plabel "Room"]
+  ask patch 16 -14 [set plabel "Main"]
+  ask patch 16 -15 [set plabel "Office"]
+
 end
 
-; plot graph
-to plotting
-  set-current-plot "Number of Turtles"
-  plot (count turtles)
+
+to draw-building
+
+
+  ask patches with [(abs(pxcor) = 21) or (abs(pycor) = 21)]
+  [set pcolor white]
+
+
+  ask patches with [(pxcor = -10) and (pycor > -10)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = 15) and (pycor > -10)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = 18) and (pycor > -18)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = -7) and (pycor > -10) and (pycor < 14)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = -5) and (pycor > 15)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = 0) and (pycor > 15)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = 5) and (pycor > 15)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = 3) and (pycor < -8)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = 7) and (pycor < -11)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = 13) and (pycor < -11)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = -17) and (pycor < -5) and (pycor > -10)]
+  [set pcolor white]
+
+  ask patches with [(pxcor = -14) and (pycor < -5) and (pycor > -10)]
+  [set pcolor white]
+
+
+  ask patches with [(pycor = 16) and (pxcor > -11) and (pxcor < 16)]
+  [set pcolor white]
+
+  ask patches with [(pycor = -9) and (pxcor < 16)]
+  [set pcolor white]
+
+  ask patches with [(pycor = 13) and (pxcor < 16)]
+  [set pcolor white]
+
+  ask patches with [(pycor = -13) and (pxcor < 4)]
+  [set pcolor white]
+
+  ask patches with [(pycor = -12) and (pxcor > 2)]
+  [set pcolor white]
+
+  ask patches with [(pycor = 14) and (pxcor > 17)]
+  [set pcolor white]
+
+  ask patches with [(pycor = 6) and (pxcor < -17)]
+  [set pcolor white]
+
+  ask patches with [(pycor = 2) and (pxcor < -17)]
+  [set pcolor white]
+
+  ask patches with [(pycor = -2) and (pxcor < -17)]
+  [set pcolor white]
+
+  ask patches with [(pycor = 6) and (pxcor > -14) and (pxcor < -9)]
+  [set pcolor white]
+
+  ask patches with [(pycor = 2) and (pxcor > -14) and (pxcor < -6)]
+  [set pcolor white]
+
+  ask patches with [(pycor = -2) and (pxcor > -14) and (pxcor < -9)]
+  [set pcolor white]
+
+  ask patches with [(pycor = 7) and (pxcor > 17)]
+  [set pcolor white]
+
+  ask patches with [(pycor = -18) and (pxcor > 12)]
+  [set pcolor white]
+
+
+
+  ask patch -11 13 [set pcolor black]
+  ask patch -8 16 [set pcolor black]
+  ask patch -3 16 [set pcolor black]
+  ask patch 2 16 [set pcolor black]
+  ask patch 6 16 [set pcolor black]
+  ask patch 18 15 [set pcolor black]
+  ask patch 18 13 [set pcolor black]
+  ask patch 15 14 [set pcolor black]
+  ask patch 15 15 [set pcolor black]
+  ask patch -7 3 [set pcolor black]
+  ask patch -7 1 [set pcolor black]
+  ask patch -5 13 [set pcolor black]
+  ask patch -16 -9 [set pcolor black]
+  ask patch -15 -9 [set pcolor black]
+  ask patch -6 -9 [set pcolor black]
+  ask patch -5 -9 [set pcolor black]
+  ask patch 1 -9 [set pcolor black]
+  ask patch 2 -9 [set pcolor black]
+  ask patch 6 -12 [set pcolor black]
+  ask patch 10 -12 [set pcolor black]
+  ask patch 16 -12 [set pcolor black]
+  ask patch 3 -11 [set pcolor black]
+  ask patch 7 -17 [set pcolor black]
+  ask patch -3 -13 [set pcolor black]
+  ask patch -2 -13 [set pcolor black]
+
+
+  ask patch 20 19 [set pcolor white]
+  ask patch 20 17 [set pcolor white]
+  ask patch 20 11 [set pcolor white]
+  ask patch 20 9 [set pcolor white]
+  ask patch -9 11 [set pcolor white]
+  ask patch -9 9 [set pcolor white]
+  ask patch -9 7 [set pcolor white]
+  ask patch -9 5 [set pcolor white]
+  ask patch -9 -1 [set pcolor white]
+  ask patch -9 -3 [set pcolor white]
+  ask patch -9 -5 [set pcolor white]
+  ask patch -9 -7 [set pcolor white]
+
+
+  ask patches with [(pxcor > 18) and (pycor < 7)]
+  [set pcolor grey]
+
+  ask patches with [(pxcor > 13) and (pycor < -18)]
+  [set pcolor grey]
+
+
+  ask patches with [(abs(pxcor) = 22) or (abs(pycor) = 22)]
+  [set pcolor grey]
+
+
+  ask patch -20 21 [set pcolor red]
+  ask patch -19 21 [set pcolor red]
+
+  ask patch 16 21 [set pcolor blue]
+  ask patch 17 21 [set pcolor blue]
+
+  ask patch -21 -16 [set pcolor green]
+  ask patch -21 -17 [set pcolor green]
+  ask patch -21 -18 [set pcolor green]
+
+
+end
+
+
+to show-staffonly
+
+  ask patches with [pcolor = black and staffonly?]
+  [set pcolor yellow]
+
+  wait 1
+
+  ask patches with [pcolor = yellow and staffonly?]
+  [set pcolor black]
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-146
+9
 10
-580
-445
+564
+566
 -1
 -1
-10.4
+12.16
 1
 10
 1
 1
 1
 0
-0
-0
-1
-0
-40
-0
-40
 1
 1
+1
+-22
+22
+-22
+22
+0
+0
 1
 ticks
 30.0
 
 BUTTON
-69
+569
 10
-137
+635
 43
 NIL
 setup
@@ -243,10 +351,10 @@ NIL
 1
 
 BUTTON
-69
-45
-137
-78
+569
+47
+636
+80
 NIL
 go
 T
@@ -260,10 +368,10 @@ NIL
 1
 
 BUTTON
-69
-80
-137
-113
+569
+85
+637
+118
 step
 go
 NIL
@@ -275,80 +383,6 @@ NIL
 NIL
 NIL
 1
-
-PLOT
-588
-12
-788
-162
-Number of turtles
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" ""
-
-SLIDER
-147
-455
-319
-488
-max_food_consumed
-max_food_consumed
-0
-100
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-MONITOR
-797
-13
-879
-58
-NIL
-count turtles
-0
-1
-11
-
-SLIDER
-147
-490
-319
-523
-grow_back_rate
-grow_back_rate
-0
-5
-1.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-147
-525
-319
-558
-offspring_threshold
-offspring_threshold
-1
-10
-2.0
-0.1
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -692,21 +726,10 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.4.0
+NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="200"/>
-    <metric>count turtles</metric>
-    <steppedValueSet variable="offspring_threshold" first="2" step="2" last="10"/>
-    <steppedValueSet variable="grow_back_rate" first="1" step="1" last="5"/>
-    <steppedValueSet variable="max_food_consumed" first="5" step="1" last="15"/>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

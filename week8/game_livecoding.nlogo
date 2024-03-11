@@ -1,211 +1,94 @@
+extensions [matrix]
+
+
 globals
 [
-  turtle_pop ; number of turtles
-  max_food_capacity ; max food capacity each patch can hold
-  init_energy_level ; initial energy level for each turtle
-  ; max_food_consumed ; max food edible by turtle per tick, defined by slider
-  ; grow_back_rate ; the amount each patch grows back
-  ; offspring_threshold ; the ratio of energy level to give birth; # of times of init_energy_level
-]
-
-
-patches-own
-[
-  food_capacity ; capacity of food for each patch
-  food_amount ; the amount of food each patch currently has
+  num-turtles
+  payoff-matrix
 ]
 
 
 turtles-own
 [
-  energy_level
-  energy_consumption
+  money
+  strategy
 ]
 
 
 to setup
 
   ca
-  ; set global variables
-  init_global
 
-  ;set up patches and turtles
-  setup_patches
-  setup_turtles
-
-  ; edit visualisations
-  visualise
-
-  ; setup plot
-  setup_plot
+  setup-globals
+  setup-turtles
 
   reset-ticks
 
 end
 
-to go ; observer
 
-  ; grow back
-  grow_back
+to setup-globals
 
-  ; turtles consume food
-  consume_food
+  set num-turtles 2
+  set payoff-matrix matrix:from-row-list [[1 -1] [-1 1]]
 
-  ; move turtles
-  move_turtles
+end
 
-  ; visualise
-  visualise
 
-  ; plot
-  plotting
+to setup-turtles
+
+  crt num-turtles
+  [
+    set money 10
+    set color white
+  ]
+
+  layout-circle turtles 4
+
+end
+
+
+to go
 
   tick
 
-end
-
-; initialise global variables
-to init_global ; observer
-  set turtle_pop 100
-  set max_food_capacity 100
-  set init_energy_level 100
-end
-
-; setup patches
-to setup_patches ; observer
-  ask patches
-  [
-    ; randomly allocate food
-    ; set food_capacity (random max_food_capacity)
-
-    ; hills of food
-    let food1 max_food_capacity - (distancexy 10 10) * 5
-    let food2 (max_food_capacity - (distancexy 25 30) * 5) * 0.6
-    set food_capacity max (list food1 food2 0)
-
-    set food_amount food_capacity
-  ]
-end
-
-; setup turtles
-to setup_turtles
-  crt turtle_pop
-  [
-    setxy random-pxcor random-pycor
-    set color red
-    set size 2
-    set shape "turtle"
-    set heading 45
-    set energy_level init_energy_level
-    set energy_consumption ((random 9) + 2)
-  ]
-end
-
-
-; tweak the visualisations
-to visualise ; observer
-  ; color patches
-  ask patches
-  [
-    set pcolor scale-color gray food_amount (- max_food_capacity) (max_food_capacity)
-  ]
-
-end
-
-; grow back
-to grow_back
-  ask patches
-  [
-    if (food_amount < food_capacity)
-    [
-      set food_amount (food_amount + grow_back_rate)
-    ]
-  ]
-end
-
-; consume food
-to consume_food ; observer
-  ask turtles
-  [
-    ; calculate food consumed
-    let food_eaten 0
-    ifelse (([food_amount] of patch-here) < max_food_consumed)
-    [
-      set food_eaten ([food_amount] of patch-here)
-    ]
-    [
-      set food_eaten max_food_consumed
-    ]
-
-    ; add energy level
-    set energy_level (energy_level + food_eaten)
-
-    ; reduce food from patch
-    ask patch-here
-    [
-      set food_amount (food_amount - ([food_eaten] of myself))
-    ]
-
-  ]
-end
-
-; move turtles
-to move_turtles
+  resize-turtles
 
   ask turtles
   [
-    ; give birth to offspring with high value of energy
-    if energy_level > (init_energy_level * offspring_threshold)
-    [
-      ; reduce energy level
-      set energy_level (energy_level - init_energy_level)
+    set strategy random 2
+  ]
 
-      ; hatch turtle
-      hatch 1
-      [
-        set color red
-        set size 2
-        set shape "turtle"
-        set heading 45
-        set energy_level init_energy_level
-        set energy_consumption ([energy_consumption] of myself)
-      ]
-    ]
+  let strat1 [strategy] of turtle 0
+  let strat2 [strategy] of turtle 1
 
-    ; reduce energy level
-    set energy_level (energy_level - energy_consumption)
+  ask turtle 0 [set money (money + matrix:get payoff-matrix strat1 strat2)]
+  ask turtle 1 [set money (money - matrix:get payoff-matrix strat1 strat2)]
 
-    ; die if energy_level is low
-    if (energy_level <= 0)
-    [ die ]
-
-    ; move to the neighbouring patch with maximum food
-    move-to (max-one-of (patch-set neighbors) [food_amount])
+  ask turtles
+  [
+    if money = 0
+    [die]
   ]
 
 end
 
-; initialise plot
-to setup_plot
-  set-current-plot "Number of Turtles"
-  set-plot-y-range 0 100
-  set-histogram-num-bars 6
-end
 
-; plot graph
-to plotting
-  set-current-plot "Number of Turtles"
-  plot (count turtles)
+to resize-turtles
+
+  ask turtles
+  [set size (money / 2)]
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-146
+210
 10
-580
-445
+647
+448
 -1
 -1
-10.4
+13.0
 1
 10
 1
@@ -215,21 +98,21 @@ GRAPHICS-WINDOW
 0
 0
 1
+-16
+16
+-16
+16
 0
-40
 0
-40
-1
-1
 1
 ticks
 30.0
 
 BUTTON
-69
-10
-137
-43
+106
+59
+172
+92
 NIL
 setup
 NIL
@@ -243,10 +126,10 @@ NIL
 1
 
 BUTTON
-69
-45
-137
-78
+106
+98
+173
+131
 NIL
 go
 T
@@ -260,10 +143,10 @@ NIL
 1
 
 BUTTON
-69
-80
-137
-113
+106
+136
+174
+169
 step
 go
 NIL
@@ -275,80 +158,6 @@ NIL
 NIL
 NIL
 1
-
-PLOT
-588
-12
-788
-162
-Number of turtles
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" ""
-
-SLIDER
-147
-455
-319
-488
-max_food_consumed
-max_food_consumed
-0
-100
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-MONITOR
-797
-13
-879
-58
-NIL
-count turtles
-0
-1
-11
-
-SLIDER
-147
-490
-319
-523
-grow_back_rate
-grow_back_rate
-0
-5
-1.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-147
-525
-319
-558
-offspring_threshold
-offspring_threshold
-1
-10
-2.0
-0.1
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -692,21 +501,10 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.4.0
+NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="200"/>
-    <metric>count turtles</metric>
-    <steppedValueSet variable="offspring_threshold" first="2" step="2" last="10"/>
-    <steppedValueSet variable="grow_back_rate" first="1" step="1" last="5"/>
-    <steppedValueSet variable="max_food_consumed" first="5" step="1" last="15"/>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

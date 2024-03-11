@@ -1,224 +1,165 @@
 globals
 [
-  turtle_pop ; number of turtles
-  max_food_capacity ; max food capacity each patch can hold
-  init_energy_level ; initial energy level for each turtle
-  ; max_food_consumed ; max food edible by turtle per tick, defined by slider
-  ; grow_back_rate ; the amount each patch grows back
-  ; offspring_threshold ; the ratio of energy level to give birth; # of times of init_energy_level
+  num-turtles
+  ringroad-location
+  ; memory-length
+  ; limit-memory
 ]
-
-
-patches-own
-[
-  food_capacity ; capacity of food for each patch
-  food_amount ; the amount of food each patch currently has
-]
-
 
 turtles-own
 [
-  energy_level
-  energy_consumption
+  driving-side
+  memory
+  crashed?
 ]
-
 
 to setup
 
   ca
-  ; set global variables
-  init_global
 
-  ;set up patches and turtles
-  setup_patches
-  setup_turtles
-
-  ; edit visualisations
-  visualise
-
-  ; setup plot
-  setup_plot
+  globals-setup
+  patches-setup
+  turtles-setup
 
   reset-ticks
 
 end
 
-to go ; observer
 
-  ; grow back
-  grow_back
+to go
 
-  ; turtles consume food
-  consume_food
+  ask turtles
+  [
+    choose-direction
+    fd 1
+  ]
 
-  ; move turtles
-  move_turtles
-
-  ; visualise
+  check-crash
+  change-direction
   visualise
-
-  ; plot
-  plotting
 
   tick
 
 end
 
-; initialise global variables
-to init_global ; observer
-  set turtle_pop 100
-  set max_food_capacity 100
-  set init_energy_level 100
-end
 
-; setup patches
-to setup_patches ; observer
-  ask patches
-  [
-    ; randomly allocate food
-    ; set food_capacity (random max_food_capacity)
+to globals-setup
 
-    ; hills of food
-    let food1 max_food_capacity - (distancexy 10 10) * 5
-    let food2 (max_food_capacity - (distancexy 25 30) * 5) * 0.6
-    set food_capacity max (list food1 food2 0)
-
-    set food_amount food_capacity
-  ]
-end
-
-; setup turtles
-to setup_turtles
-  crt turtle_pop
-  [
-    setxy random-pxcor random-pycor
-    set color red
-    set size 2
-    set shape "turtle"
-    set heading 45
-    set energy_level init_energy_level
-    set energy_consumption ((random 9) + 2)
-  ]
-end
-
-
-; tweak the visualisations
-to visualise ; observer
-  ; color patches
-  ask patches
-  [
-    set pcolor scale-color gray food_amount (- max_food_capacity) (max_food_capacity)
-  ]
+  set num-turtles 40
+  set ringroad-location min list (max-pycor - 6) (max-pxcor - 6)
 
 end
 
-; grow back
-to grow_back
-  ask patches
-  [
-    if (food_amount < food_capacity)
-    [
-      set food_amount (food_amount + grow_back_rate)
-    ]
-  ]
+
+to patches-setup
+
+  ask patches with [(pxcor = -1 * ringroad-location or pxcor = ringroad-location or pycor = -1 * ringroad-location or pycor = ringroad-location) and (pxcor >= -1 * ringroad-location and pxcor <= ringroad-location and pycor >= -1 * ringroad-location and pycor <= ringroad-location)]
+  [set pcolor grey]
+
 end
 
-; consume food
-to consume_food ; observer
-  ask turtles
-  [
-    ; calculate food consumed
-    let food_eaten 0
-    ifelse (([food_amount] of patch-here) < max_food_consumed)
-    [
-      set food_eaten ([food_amount] of patch-here)
-    ]
-    [
-      set food_eaten max_food_consumed
-    ]
 
-    ; add energy level
-    set energy_level (energy_level + food_eaten)
+to turtles-setup
 
-    ; reduce food from patch
-    ask patch-here
-    [
-      set food_amount (food_amount - ([food_eaten] of myself))
-    ]
-
-  ]
-end
-
-; move turtles
-to move_turtles
+  ask n-of num-turtles patches with [pcolor = grey]
+  [sprout 1 [set color red]]
 
   ask turtles
   [
-    ; give birth to offspring with high value of energy
-    if energy_level > (init_energy_level * offspring_threshold)
-    [
-      ; reduce energy level
-      set energy_level (energy_level - init_energy_level)
+    set memory []
+    set crashed? false
+    set driving-side (one-of ["left" "right"])
+    choose-direction
+  ]
 
-      ; hatch turtle
-      hatch 1
-      [
-        set color red
-        set size 2
-        set shape "turtle"
-        set heading 45
-        set energy_level init_energy_level
-        set energy_consumption ([energy_consumption] of myself)
-      ]
+  visualise
+
+end
+
+
+to choose-direction ; turtle context
+  set heading towards one-of (neighbors4 in-cone 1 300) with [pcolor = grey]
+end
+
+to check-crash ; observer context
+
+  ask turtles
+  [
+    set crashed? false
+    let crashed-turtles (turtles-here with [driving-side != ([driving-side] of myself)])
+    if any? crashed-turtles
+    [
+      set crashed? true
+      set memory (sentence memory ([driving-side] of crashed-turtles))
     ]
 
-    ; reduce energy level
-    set energy_level (energy_level - energy_consumption)
-
-    ; die if energy_level is low
-    if (energy_level <= 0)
-    [ die ]
-
-    ; move to the neighbouring patch with maximum food
-    move-to (max-one-of (patch-set neighbors) [food_amount])
   ]
 
 end
 
-; initialise plot
-to setup_plot
-  set-current-plot "Number of Turtles"
-  set-plot-y-range 0 100
-  set-histogram-num-bars 6
+to change-direction ; observer context
+  ; change direction based on the whole memory
+
+  ask turtles [
+    let memory-temp []
+    ifelse ((limit-memory = true) and ((length memory) > memory-length))
+    [ set memory-temp (sublist memory ((length memory) - memory-length) (length memory)) ]
+    [ set memory-temp memory ]
+
+    let left-count length (filter [i -> i = "left"] memory-temp)
+    let right-count length (filter [i -> i = "right"] memory-temp)
+    if (left-count > right-count) [set driving-side "left"]
+    if (right-count > left-count) [set driving-side "right"]
+  ]
+
+
+
 end
 
-; plot graph
-to plotting
-  set-current-plot "Number of Turtles"
-  plot (count turtles)
+to visualise ; observer context
+
+  ask turtles
+  [
+    (ifelse
+      driving-side = "left" [set color blue]
+      driving-side = "right" [set color red]
+
+      [set color gray]
+    )
+    if crashed? = true [set color yellow]
+  ]
 end
+
+; answers to the questions
+
+; differentiation of road patches and non road patches
+; - pcolor grey for road patches, pcolor black (default) for non-road patches
+
+; choose-direction
+; cut corners for neighbors
+; in-cone excludes the patch behind
 @#$#@#$#@
 GRAPHICS-WINDOW
-146
-10
-580
-445
+232
+12
+774
+555
 -1
 -1
-10.4
+16.2
 1
 10
 1
 1
 1
 0
-0
-0
 1
-0
-40
-0
-40
+1
+1
+-16
+16
+-16
+16
 1
 1
 1
@@ -226,10 +167,10 @@ ticks
 30.0
 
 BUTTON
-69
-10
-137
-43
+37
+26
+103
+59
 NIL
 setup
 NIL
@@ -243,10 +184,10 @@ NIL
 1
 
 BUTTON
-69
-45
-137
-78
+113
+26
+181
+59
 NIL
 go
 T
@@ -260,11 +201,11 @@ NIL
 1
 
 BUTTON
-69
-80
-137
-113
-step
+115
+77
+178
+110
+NIL
 go
 NIL
 1
@@ -277,78 +218,49 @@ NIL
 1
 
 PLOT
-588
-12
-788
-162
-Number of turtles
+813
+85
+1013
+235
+driving side
 NIL
 NIL
 0.0
 10.0
 0.0
-10.0
+1.0
 true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" ""
+"left" 1.0 0 -13345367 true "" "plot (count turtles with [driving-side = \"left\"]) / (count turtles)"
+"right" 1.0 0 -2674135 true "" "plot (count turtles with [driving-side = \"right\"]) / (count turtles)"
 
 SLIDER
-147
-455
-319
-488
-max_food_consumed
-max_food_consumed
+40
+156
+212
+189
+memory-length
+memory-length
 0
 100
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-MONITOR
-797
-13
-879
-58
-NIL
-count turtles
-0
-1
-11
-
-SLIDER
-147
-490
-319
-523
-grow_back_rate
-grow_back_rate
-0
-5
 1.0
-0.1
+1
 1
 NIL
 HORIZONTAL
 
-SLIDER
-147
-525
-319
-558
-offspring_threshold
-offspring_threshold
+SWITCH
+43
+208
+167
+241
+limit-memory
+limit-memory
+0
 1
-10
-2.0
-0.1
-1
-NIL
-HORIZONTAL
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -696,17 +608,6 @@ NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="200"/>
-    <metric>count turtles</metric>
-    <steppedValueSet variable="offspring_threshold" first="2" step="2" last="10"/>
-    <steppedValueSet variable="grow_back_rate" first="1" step="1" last="5"/>
-    <steppedValueSet variable="max_food_consumed" first="5" step="1" last="15"/>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

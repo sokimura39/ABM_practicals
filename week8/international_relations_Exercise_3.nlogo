@@ -1,211 +1,227 @@
+extensions [matrix]
+
+
 globals
 [
-  turtle_pop ; number of turtles
-  max_food_capacity ; max food capacity each patch can hold
-  init_energy_level ; initial energy level for each turtle
-  ; max_food_consumed ; max food edible by turtle per tick, defined by slider
-  ; grow_back_rate ; the amount each patch grows back
-  ; offspring_threshold ; the ratio of energy level to give birth; # of times of init_energy_level
-]
-
-
-patches-own
-[
-  food_capacity ; capacity of food for each patch
-  food_amount ; the amount of food each patch currently has
+  num-turtles
+  payoff-matrix
+  average-turtle-size
 ]
 
 
 turtles-own
 [
-  energy_level
-  energy_consumption
+  my-strategy
+  utility
+]
+
+
+links-own
+[
+  history
 ]
 
 
 to setup
 
   ca
-  ; set global variables
-  init_global
 
-  ;set up patches and turtles
-  setup_patches
-  setup_turtles
-
-  ; edit visualisations
-  visualise
-
-  ; setup plot
-  setup_plot
+  setup-globals
+  setup-turtles
+  setup-links
 
   reset-ticks
 
 end
 
-to go ; observer
 
-  ; grow back
-  grow_back
+to setup-globals
 
-  ; turtles consume food
-  consume_food
+  set num-turtles 10
+  set payoff-matrix matrix:from-row-list [[2 1 0] [3 1 0.3] [4 1 0.6]]
+  set average-turtle-size 2
 
-  ; move turtles
-  move_turtles
+end
 
-  ; visualise
-  visualise
 
-  ; plot
-  plotting
+to setup-turtles
+
+  set-default-shape turtles "circle"
+
+  crt num-turtles
+  [
+    set utility 0
+    create-links-to other turtles
+    set-strategy
+  ]
+
+  layout-circle turtles min (list (4 * max-pxcor / 5) (4 * max-pycor / 5))
+
+end
+
+
+to set-strategy
+
+  set my-strategy one-of [ "grim" "tft" "hostile" "random"]
+
+  if my-strategy = "random"
+  [set color white]
+
+  if my-strategy = "tft"
+  [set color blue]
+
+  if my-strategy = "hostile"
+  [set color red]
+
+  if my-strategy = "grim"
+  [set color brown]
+
+end
+
+
+to setup-links
+
+  ask links
+  [
+    set history []
+  ]
+
+end
+
+
+to go
 
   tick
 
+  interaction
+  set-sizes
+
 end
 
-; initialise global variables
-to init_global ; observer
-  set turtle_pop 100
-  set max_food_capacity 100
-  set init_energy_level 100
-end
 
-; setup patches
-to setup_patches ; observer
-  ask patches
+to interaction
+
+  let interaction-link (one-of links)
+
+  let player-1 ([end1] of interaction-link)
+  let player-2 ([end2] of interaction-link)
+
+  ask interaction-link ;(link-set link player-1 player-2 link player-2 player-1)
   [
-    ; randomly allocate food
-    ; set food_capacity (random max_food_capacity)
-
-    ; hills of food
-    let food1 max_food_capacity - (distancexy 10 10) * 5
-    let food2 (max_food_capacity - (distancexy 25 30) * 5) * 0.6
-    set food_capacity max (list food1 food2 0)
-
-    set food_amount food_capacity
+   set thickness 1
   ]
-end
 
-; setup turtles
-to setup_turtles
-  crt turtle_pop
+  play-game player-1 player-2
+
+  ask interaction-link ;(link-set link player-1 player-2 link player-2 player-1)
   [
-    setxy random-pxcor random-pycor
-    set color red
-    set size 2
-    set shape "turtle"
-    set heading 45
-    set energy_level init_energy_level
-    set energy_consumption ((random 9) + 2)
-  ]
-end
-
-
-; tweak the visualisations
-to visualise ; observer
-  ; color patches
-  ask patches
-  [
-    set pcolor scale-color gray food_amount (- max_food_capacity) (max_food_capacity)
+   set thickness 0.1
   ]
 
 end
 
-; grow back
-to grow_back
-  ask patches
-  [
-    if (food_amount < food_capacity)
-    [
-      set food_amount (food_amount + grow_back_rate)
-    ]
-  ]
+
+to play-game [first-player second-player]
+
+  let player-1-strat ([choose-strategy (history-with second-player)] of first-player)
+  let player-2-strat ([choose-strategy (history-with first-player)] of second-player)
+
+  update-utility-and-history first-player second-player player-1-strat player-2-strat
+  update-utility-and-history second-player first-player player-2-strat player-1-strat
+
 end
 
-; consume food
-to consume_food ; observer
-  ask turtles
+
+to update-utility-and-history [p1 p2 p1-strat p2-strat]
+
+  ask p1
   [
-    ; calculate food consumed
-    let food_eaten 0
-    ifelse (([food_amount] of patch-here) < max_food_consumed)
-    [
-      set food_eaten ([food_amount] of patch-here)
-    ]
-    [
-      set food_eaten max_food_consumed
-    ]
-
-    ; add energy level
-    set energy_level (energy_level + food_eaten)
-
-    ; reduce food from patch
-    ask patch-here
-    [
-      set food_amount (food_amount - ([food_eaten] of myself))
-    ]
-
+    set utility (utility + matrix:get payoff-matrix p1-strat p2-strat)
+    ask out-link-to p2 [ set history (lput p2-strat history)]
   ]
+
 end
 
-; move turtles
-to move_turtles
+
+to-report history-with [other-player]
+
+  report [history] of (out-link-to other-player)
+
+end
+
+
+to set-sizes
+
+  let normaliser (mean [utility] of turtles)
 
   ask turtles
   [
-    ; give birth to offspring with high value of energy
-    if energy_level > (init_energy_level * offspring_threshold)
-    [
-      ; reduce energy level
-      set energy_level (energy_level - init_energy_level)
-
-      ; hatch turtle
-      hatch 1
-      [
-        set color red
-        set size 2
-        set shape "turtle"
-        set heading 45
-        set energy_level init_energy_level
-        set energy_consumption ([energy_consumption] of myself)
-      ]
-    ]
-
-    ; reduce energy level
-    set energy_level (energy_level - energy_consumption)
-
-    ; die if energy_level is low
-    if (energy_level <= 0)
-    [ die ]
-
-    ; move to the neighbouring patch with maximum food
-    move-to (max-one-of (patch-set neighbors) [food_amount])
+   set size average-turtle-size * ((utility / normaliser))
   ]
 
 end
 
-; initialise plot
-to setup_plot
-  set-current-plot "Number of Turtles"
-  set-plot-y-range 0 100
-  set-histogram-num-bars 6
+
+to-report choose-strategy [this-history] ; turtle-context
+
+  if my-strategy = "random"
+  [report random-strat this-history]
+
+  if my-strategy = "tft"
+  [report tft-strat this-history]
+
+  if my-strategy = "hostile"
+  [report hostile-strat this-history]
+
+  if my-strategy = "grim"
+  [report grim-strat this-history]
+
 end
 
-; plot graph
-to plotting
-  set-current-plot "Number of Turtles"
-  plot (count turtles)
+
+to-report random-strat [this-history]
+
+  report random 3
+
+end
+
+
+to-report tft-strat [this-history]
+
+  ifelse (length this-history) > 0
+  [report last this-history]
+  [report 0]
+
+end
+
+
+to-report grim-strat [this-history]
+
+  ifelse member? 2 this-history
+  [report 2]
+  [
+    ifelse member? 1 this-history
+    [report 1]
+    [report 0]
+  ]
+
+end
+
+
+to-report hostile-strat [this-history]
+
+  report 2
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-146
+210
 10
-580
-445
+647
+448
 -1
 -1
-10.4
+13.0
 1
 10
 1
@@ -215,21 +231,21 @@ GRAPHICS-WINDOW
 0
 0
 1
+-16
+16
+-16
+16
 0
-40
 0
-40
-1
-1
 1
 ticks
 30.0
 
 BUTTON
-69
-10
-137
-43
+106
+59
+172
+92
 NIL
 setup
 NIL
@@ -243,10 +259,10 @@ NIL
 1
 
 BUTTON
-69
-45
-137
-78
+106
+98
+173
+131
 NIL
 go
 T
@@ -258,97 +274,6 @@ NIL
 NIL
 NIL
 1
-
-BUTTON
-69
-80
-137
-113
-step
-go
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-PLOT
-588
-12
-788
-162
-Number of turtles
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" ""
-
-SLIDER
-147
-455
-319
-488
-max_food_consumed
-max_food_consumed
-0
-100
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-MONITOR
-797
-13
-879
-58
-NIL
-count turtles
-0
-1
-11
-
-SLIDER
-147
-490
-319
-523
-grow_back_rate
-grow_back_rate
-0
-5
-1.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-147
-525
-319
-558
-offspring_threshold
-offspring_threshold
-1
-10
-2.0
-0.1
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -692,21 +617,10 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.4.0
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="200"/>
-    <metric>count turtles</metric>
-    <steppedValueSet variable="offspring_threshold" first="2" step="2" last="10"/>
-    <steppedValueSet variable="grow_back_rate" first="1" step="1" last="5"/>
-    <steppedValueSet variable="max_food_consumed" first="5" step="1" last="15"/>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

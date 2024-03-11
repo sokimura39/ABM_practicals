@@ -1,211 +1,81 @@
 globals
 [
-  turtle_pop ; number of turtles
-  max_food_capacity ; max food capacity each patch can hold
-  init_energy_level ; initial energy level for each turtle
-  ; max_food_consumed ; max food edible by turtle per tick, defined by slider
-  ; grow_back_rate ; the amount each patch grows back
-  ; offspring_threshold ; the ratio of energy level to give birth; # of times of init_energy_level
-]
-
-
-patches-own
-[
-  food_capacity ; capacity of food for each patch
-  food_amount ; the amount of food each patch currently has
-]
-
-
-turtles-own
-[
-  energy_level
-  energy_consumption
+  population
+  init-infect
+  n-connections
 ]
 
 
 to setup
 
   ca
-  ; set global variables
-  init_global
-
-  ;set up patches and turtles
-  setup_patches
-  setup_turtles
-
-  ; edit visualisations
-  visualise
-
-  ; setup plot
-  setup_plot
-
   reset-ticks
+
+  set-globals
+
+  crt population
+  [
+   set color cyan
+  ]
+
+  layout-circle turtles 15
+
+  ask n-of init-infect turtles
+  [
+   set color red
+  ]
+
+  ask turtles
+  [
+    create-links-with n-of n-connections (other turtles)
+    ; create-links-to n-of n-connections (other turtles)
+  ]
 
 end
 
-to go ; observer
 
-  ; grow back
-  grow_back
+to set-globals
 
-  ; turtles consume food
-  consume_food
+  set population 50
+  set init-infect 1
+  set n-connections 3
 
-  ; move turtles
-  move_turtles
+end
 
-  ; visualise
-  visualise
 
-  ; plot
-  plotting
+to go
 
   tick
 
-end
-
-; initialise global variables
-to init_global ; observer
-  set turtle_pop 100
-  set max_food_capacity 100
-  set init_energy_level 100
-end
-
-; setup patches
-to setup_patches ; observer
-  ask patches
+  ask one-of turtles with [color = red]
   [
-    ; randomly allocate food
-    ; set food_capacity (random max_food_capacity)
 
-    ; hills of food
-    let food1 max_food_capacity - (distancexy 10 10) * 5
-    let food2 (max_food_capacity - (distancexy 25 30) * 5) * 0.6
-    set food_capacity max (list food1 food2 0)
+    ;ask up-to-n-of 1 (out-link-neighbors with [color != red])
+    ;[
+    ;  set color red
+    ;]
 
-    set food_amount food_capacity
-  ]
-end
-
-; setup turtles
-to setup_turtles
-  crt turtle_pop
-  [
-    setxy random-pxcor random-pycor
-    set color red
-    set size 2
-    set shape "turtle"
-    set heading 45
-    set energy_level init_energy_level
-    set energy_consumption ((random 9) + 2)
-  ]
-end
-
-
-; tweak the visualisations
-to visualise ; observer
-  ; color patches
-  ask patches
-  [
-    set pcolor scale-color gray food_amount (- max_food_capacity) (max_food_capacity)
-  ]
-
-end
-
-; grow back
-to grow_back
-  ask patches
-  [
-    if (food_amount < food_capacity)
+    ask up-to-n-of 1 (my-out-links with [color != red])
     [
-      set food_amount (food_amount + grow_back_rate)
-    ]
-  ]
-end
-
-; consume food
-to consume_food ; observer
-  ask turtles
-  [
-    ; calculate food consumed
-    let food_eaten 0
-    ifelse (([food_amount] of patch-here) < max_food_consumed)
-    [
-      set food_eaten ([food_amount] of patch-here)
-    ]
-    [
-      set food_eaten max_food_consumed
-    ]
-
-    ; add energy level
-    set energy_level (energy_level + food_eaten)
-
-    ; reduce food from patch
-    ask patch-here
-    [
-      set food_amount (food_amount - ([food_eaten] of myself))
-    ]
-
-  ]
-end
-
-; move turtles
-to move_turtles
-
-  ask turtles
-  [
-    ; give birth to offspring with high value of energy
-    if energy_level > (init_energy_level * offspring_threshold)
-    [
-      ; reduce energy level
-      set energy_level (energy_level - init_energy_level)
-
-      ; hatch turtle
-      hatch 1
+      set color red
+      ask both-ends ; ask end2
       [
         set color red
-        set size 2
-        set shape "turtle"
-        set heading 45
-        set energy_level init_energy_level
-        set energy_consumption ([energy_consumption] of myself)
       ]
     ]
 
-    ; reduce energy level
-    set energy_level (energy_level - energy_consumption)
-
-    ; die if energy_level is low
-    if (energy_level <= 0)
-    [ die ]
-
-    ; move to the neighbouring patch with maximum food
-    move-to (max-one-of (patch-set neighbors) [food_amount])
   ]
 
 end
-
-; initialise plot
-to setup_plot
-  set-current-plot "Number of Turtles"
-  set-plot-y-range 0 100
-  set-histogram-num-bars 6
-end
-
-; plot graph
-to plotting
-  set-current-plot "Number of Turtles"
-  plot (count turtles)
-end
 @#$#@#$#@
 GRAPHICS-WINDOW
-146
+210
 10
-580
-445
+720
+521
 -1
 -1
-10.4
+15.212121212121213
 1
 10
 1
@@ -215,21 +85,21 @@ GRAPHICS-WINDOW
 0
 0
 1
+-16
+16
+-16
+16
 0
-40
 0
-40
-1
-1
 1
 ticks
 30.0
 
 BUTTON
-69
-10
-137
-43
+113
+99
+179
+132
 NIL
 setup
 NIL
@@ -243,10 +113,10 @@ NIL
 1
 
 BUTTON
-69
-45
-137
-78
+113
+146
+179
+179
 NIL
 go
 T
@@ -260,10 +130,10 @@ NIL
 1
 
 BUTTON
-69
-80
-137
 113
+188
+179
+221
 step
 go
 NIL
@@ -275,80 +145,6 @@ NIL
 NIL
 NIL
 1
-
-PLOT
-588
-12
-788
-162
-Number of turtles
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" ""
-
-SLIDER
-147
-455
-319
-488
-max_food_consumed
-max_food_consumed
-0
-100
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-MONITOR
-797
-13
-879
-58
-NIL
-count turtles
-0
-1
-11
-
-SLIDER
-147
-490
-319
-523
-grow_back_rate
-grow_back_rate
-0
-5
-1.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-147
-525
-319
-558
-offspring_threshold
-offspring_threshold
-1
-10
-2.0
-0.1
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -692,21 +488,10 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.4.0
+NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="200"/>
-    <metric>count turtles</metric>
-    <steppedValueSet variable="offspring_threshold" first="2" step="2" last="10"/>
-    <steppedValueSet variable="grow_back_rate" first="1" step="1" last="5"/>
-    <steppedValueSet variable="max_food_consumed" first="5" step="1" last="15"/>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

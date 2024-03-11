@@ -1,224 +1,151 @@
+extensions
+[
+  matrix
+]
+
 globals
 [
-  turtle_pop ; number of turtles
-  max_food_capacity ; max food capacity each patch can hold
-  init_energy_level ; initial energy level for each turtle
-  ; max_food_consumed ; max food edible by turtle per tick, defined by slider
-  ; grow_back_rate ; the amount each patch grows back
-  ; offspring_threshold ; the ratio of energy level to give birth; # of times of init_energy_level
+  payoff-matrix
+]
+
+breed [scissors scissor]
+breed [papers paper]
+breed [stones stone]
+
+turtles-own
+[
+  strategy
 ]
 
 
 patches-own
 [
-  food_capacity ; capacity of food for each patch
-  food_amount ; the amount of food each patch currently has
-]
-
-
-turtles-own
-[
-  energy_level
-  energy_consumption
 ]
 
 
 to setup
 
   ca
-  ; set global variables
-  init_global
 
-  ;set up patches and turtles
-  setup_patches
-  setup_turtles
-
-  ; edit visualisations
-  visualise
-
-  ; setup plot
-  setup_plot
+  setup-globals
+  create-players
+  setup-turtles
+  setup-breeds
+  colour-patches
 
   reset-ticks
 
 end
 
-to go ; observer
+to setup-globals
+  set payoff-matrix matrix:from-row-list [[0 1 -1] [-1 0 1] [1 -1 0]]
+end
 
-  ; grow back
-  grow_back
+to create-players
+  ask patches
+  [
+    let strat (random 3)
+    (ifelse
+      strat = 0 [sprout-scissors 1]
+      strat = 1 [sprout-papers 1]
+      strat = 2 [sprout-stones 1]
+      []
+    )
+  ]
 
-  ; turtles consume food
-  consume_food
+end
 
-  ; move turtles
-  move_turtles
 
-  ; visualise
-  visualise
+to setup-turtles
 
-  ; plot
-  plotting
+  ask turtles
+  [
+    set color black
+    set size 0.5
+    set heading 0
+  ]
+
+end
+
+
+to setup-breeds
+  ; set default shapes
+  set-default-shape scissors "triangle"
+  set-default-shape papers "square"
+  set-default-shape stones "circle"
+
+  ; set strategy
+  ask scissors [set strategy 0]
+  ask papers [set strategy 1]
+  ask stones [set strategy 2]
+
+end
+
+
+to colour-patches
+
+  ask patches
+  [
+    recolour-self
+  ]
+
+end
+
+
+to recolour-self
+
+  let strat "None"
+
+  (ifelse
+    strat = 0 [set pcolor blue]
+    strat = 1 [set pcolor white]
+    strat = 2 [set pcolor red]
+    []
+  )
+
+end
+
+
+to go
+
+  fight
+  colour-patches
 
   tick
 
 end
 
-; initialise global variables
-to init_global ; observer
-  set turtle_pop 100
-  set max_food_capacity 100
-  set init_energy_level 100
-end
 
-; setup patches
-to setup_patches ; observer
-  ask patches
-  [
-    ; randomly allocate food
-    ; set food_capacity (random max_food_capacity)
-
-    ; hills of food
-    let food1 max_food_capacity - (distancexy 10 10) * 5
-    let food2 (max_food_capacity - (distancexy 25 30) * 5) * 0.6
-    set food_capacity max (list food1 food2 0)
-
-    set food_amount food_capacity
-  ]
-end
-
-; setup turtles
-to setup_turtles
-  crt turtle_pop
-  [
-    setxy random-pxcor random-pycor
-    set color red
-    set size 2
-    set shape "turtle"
-    set heading 45
-    set energy_level init_energy_level
-    set energy_consumption ((random 9) + 2)
-  ]
-end
-
-
-; tweak the visualisations
-to visualise ; observer
-  ; color patches
-  ask patches
-  [
-    set pcolor scale-color gray food_amount (- max_food_capacity) (max_food_capacity)
-  ]
-
-end
-
-; grow back
-to grow_back
-  ask patches
-  [
-    if (food_amount < food_capacity)
-    [
-      set food_amount (food_amount + grow_back_rate)
-    ]
-  ]
-end
-
-; consume food
-to consume_food ; observer
-  ask turtles
-  [
-    ; calculate food consumed
-    let food_eaten 0
-    ifelse (([food_amount] of patch-here) < max_food_consumed)
-    [
-      set food_eaten ([food_amount] of patch-here)
-    ]
-    [
-      set food_eaten max_food_consumed
-    ]
-
-    ; add energy level
-    set energy_level (energy_level + food_eaten)
-
-    ; reduce food from patch
-    ask patch-here
-    [
-      set food_amount (food_amount - ([food_eaten] of myself))
-    ]
-
-  ]
-end
-
-; move turtles
-to move_turtles
+to fight
 
   ask turtles
   [
-    ; give birth to offspring with high value of energy
-    if energy_level > (init_energy_level * offspring_threshold)
-    [
-      ; reduce energy level
-      set energy_level (energy_level - init_energy_level)
 
-      ; hatch turtle
-      hatch 1
-      [
-        set color red
-        set size 2
-        set shape "turtle"
-        set heading 45
-        set energy_level init_energy_level
-        set energy_consumption ([energy_consumption] of myself)
-      ]
-    ]
-
-    ; reduce energy level
-    set energy_level (energy_level - energy_consumption)
-
-    ; die if energy_level is low
-    if (energy_level <= 0)
-    [ die ]
-
-    ; move to the neighbouring patch with maximum food
-    move-to (max-one-of (patch-set neighbors) [food_amount])
   ]
 
-end
-
-; initialise plot
-to setup_plot
-  set-current-plot "Number of Turtles"
-  set-plot-y-range 0 100
-  set-histogram-num-bars 6
-end
-
-; plot graph
-to plotting
-  set-current-plot "Number of Turtles"
-  plot (count turtles)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-146
-10
+356
+12
+923
 580
-445
 -1
 -1
-10.4
+27.95
 1
 10
 1
 1
 1
 0
-0
-0
+1
+1
 1
 0
-40
+19
 0
-40
+19
 1
 1
 1
@@ -226,10 +153,27 @@ ticks
 30.0
 
 BUTTON
-69
-10
-137
-43
+44
+126
+107
+159
+NIL
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+134
+128
+200
+161
 NIL
 setup
 NIL
@@ -242,48 +186,14 @@ NIL
 NIL
 1
 
-BUTTON
-69
-45
-137
-78
-NIL
-go
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-69
-80
-137
-113
-step
-go
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
 PLOT
-588
-12
-788
-162
-Number of turtles
-NIL
-NIL
+24
+252
+337
+527
+Evolution of Strategies
+Tick Number
+Population
 0.0
 10.0
 0.0
@@ -292,63 +202,9 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" ""
-
-SLIDER
-147
-455
-319
-488
-max_food_consumed
-max_food_consumed
-0
-100
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-MONITOR
-797
-13
-879
-58
-NIL
-count turtles
-0
-1
-11
-
-SLIDER
-147
-490
-319
-523
-grow_back_rate
-grow_back_rate
-0
-5
-1.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-147
-525
-319
-558
-offspring_threshold
-offspring_threshold
-1
-10
-2.0
-0.1
-1
-NIL
-HORIZONTAL
+"default" 1.0 0 -13345367 true "" "plot count scissors"
+"pen-1" 1.0 0 -16777216 true "" "plot count papers"
+"pen-2" 1.0 0 -2674135 true "" "plot count stones"
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -696,17 +552,6 @@ NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="200"/>
-    <metric>count turtles</metric>
-    <steppedValueSet variable="offspring_threshold" first="2" step="2" last="10"/>
-    <steppedValueSet variable="grow_back_rate" first="1" step="1" last="5"/>
-    <steppedValueSet variable="max_food_consumed" first="5" step="1" last="15"/>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

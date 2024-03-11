@@ -1,235 +1,96 @@
+extensions
+[
+  gis
+]
+
 globals
 [
-  turtle_pop ; number of turtles
-  max_food_capacity ; max food capacity each patch can hold
-  init_energy_level ; initial energy level for each turtle
-  ; max_food_consumed ; max food edible by turtle per tick, defined by slider
-  ; grow_back_rate ; the amount each patch grows back
-  ; offspring_threshold ; the ratio of energy level to give birth; # of times of init_energy_level
+  london_boroughs
 ]
-
-
-patches-own
-[
-  food_capacity ; capacity of food for each patch
-  food_amount ; the amount of food each patch currently has
-]
-
-
-turtles-own
-[
-  energy_level
-  energy_consumption
-]
-
 
 to setup
-
   ca
-  ; set global variables
-  init_global
+  ; set crs
+  gis:load-coordinate-system "Tutorial6Data/londonBoroughs.prj"
+  ; load data
+  set london_boroughs gis:load-dataset "Tutorial6Data/londonBoroughs.shp"
 
-  ;set up patches and turtles
-  setup_patches
-  setup_turtles
+  ; set window
+  gis:set-world-envelope (gis:envelope-of london_boroughs)
 
-  ; edit visualisations
-  visualise
+  ; draw
+  ; fill with blue
+  gis:set-drawing-color blue
+  gis:fill london_boroughs 2
 
-  ; setup plot
-  setup_plot
-
-  reset-ticks
-
-end
-
-to go ; observer
-
-  ; grow back
-  grow_back
-
-  ; turtles consume food
-  consume_food
-
-  ; move turtles
-  move_turtles
-
-  ; visualise
-  visualise
-
-  ; plot
-  plotting
-
-  tick
+  ; borders with red
+  gis:set-drawing-color red
+  gis:draw london_boroughs 2
 
 end
 
-; initialise global variables
-to init_global ; observer
-  set turtle_pop 100
-  set max_food_capacity 100
-  set init_energy_level 100
-end
-
-; setup patches
-to setup_patches ; observer
-  ask patches
-  [
-    ; randomly allocate food
-    ; set food_capacity (random max_food_capacity)
-
-    ; hills of food
-    let food1 max_food_capacity - (distancexy 10 10) * 5
-    let food2 (max_food_capacity - (distancexy 25 30) * 5) * 0.6
-    set food_capacity max (list food1 food2 0)
-
-    set food_amount food_capacity
+to colour-by-pop
+  let max_pop gis:property-maximum london_boroughs "POP2017"
+  foreach gis:feature-list-of london_boroughs
+  [ vector-feature ->
+    let population gis:property-value vector-feature "POP2017"
+    gis:set-drawing-color scale-color red population 0 max_pop
+    gis:fill vector-feature 1.5
   ]
 end
 
-; setup turtles
-to setup_turtles
-  crt turtle_pop
-  [
-    setxy random-pxcor random-pycor
-    set color red
-    set size 2
-    set shape "turtle"
-    set heading 45
-    set energy_level init_energy_level
-    set energy_consumption ((random 9) + 2)
+to print-names
+  foreach gis:feature-list-of london_boroughs
+  [ vector-feature ->
+    show gis:property-value vector-feature "NAME_2"
   ]
 end
 
-
-; tweak the visualisations
-to visualise ; observer
-  ; color patches
-  ask patches
-  [
-    set pcolor scale-color gray food_amount (- max_food_capacity) (max_food_capacity)
-  ]
-
-end
-
-; grow back
-to grow_back
-  ask patches
-  [
-    if (food_amount < food_capacity)
+to display-names
+  foreach gis:feature-list-of london_boroughs
+  [ vector-feature ->
+    let my_centroid gis:location-of (gis:centroid-of vector-feature)
+    crt 1
     [
-      set food_amount (food_amount + grow_back_rate)
+      setxy (item 0 my_centroid) (item 1 my_centroid)
+      set label gis:property-value vector-feature "NAME_2"
+      set size 0
     ]
   ]
-end
-
-; consume food
-to consume_food ; observer
-  ask turtles
-  [
-    ; calculate food consumed
-    let food_eaten 0
-    ifelse (([food_amount] of patch-here) < max_food_consumed)
-    [
-      set food_eaten ([food_amount] of patch-here)
-    ]
-    [
-      set food_eaten max_food_consumed
-    ]
-
-    ; add energy level
-    set energy_level (energy_level + food_eaten)
-
-    ; reduce food from patch
-    ask patch-here
-    [
-      set food_amount (food_amount - ([food_eaten] of myself))
-    ]
-
-  ]
-end
-
-; move turtles
-to move_turtles
-
-  ask turtles
-  [
-    ; give birth to offspring with high value of energy
-    if energy_level > (init_energy_level * offspring_threshold)
-    [
-      ; reduce energy level
-      set energy_level (energy_level - init_energy_level)
-
-      ; hatch turtle
-      hatch 1
-      [
-        set color red
-        set size 2
-        set shape "turtle"
-        set heading 45
-        set energy_level init_energy_level
-        set energy_consumption ([energy_consumption] of myself)
-      ]
-    ]
-
-    ; reduce energy level
-    set energy_level (energy_level - energy_consumption)
-
-    ; die if energy_level is low
-    if (energy_level <= 0)
-    [ die ]
-
-    ; move to the neighbouring patch with maximum food
-    move-to (max-one-of (patch-set neighbors) [food_amount])
-  ]
-
-end
-
-; initialise plot
-to setup_plot
-  set-current-plot "Number of Turtles"
-  set-plot-y-range 0 100
-  set-histogram-num-bars 6
-end
-
-; plot graph
-to plotting
-  set-current-plot "Number of Turtles"
-  plot (count turtles)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-146
+210
 10
-580
-445
+647
+448
 -1
 -1
-10.4
+13.0
 1
 10
 1
 1
 1
 0
-0
-0
-1
-0
-40
-0
-40
 1
 1
+1
+-16
+16
+-16
+16
+0
+0
 1
 ticks
 30.0
 
 BUTTON
-69
-10
-137
-43
+32
+23
+95
+56
 NIL
 setup
 NIL
@@ -243,13 +104,13 @@ NIL
 1
 
 BUTTON
-69
-45
-137
-78
+34
+67
+143
+100
 NIL
-go
-T
+colour-by-pop
+NIL
 1
 T
 OBSERVER
@@ -260,12 +121,12 @@ NIL
 1
 
 BUTTON
-69
-80
-137
-113
-step
-go
+36
+115
+144
+148
+NIL
+display-names
 NIL
 1
 T
@@ -275,80 +136,6 @@ NIL
 NIL
 NIL
 1
-
-PLOT
-588
-12
-788
-162
-Number of turtles
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" ""
-
-SLIDER
-147
-455
-319
-488
-max_food_consumed
-max_food_consumed
-0
-100
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-MONITOR
-797
-13
-879
-58
-NIL
-count turtles
-0
-1
-11
-
-SLIDER
-147
-490
-319
-523
-grow_back_rate
-grow_back_rate
-0
-5
-1.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-147
-525
-319
-558
-offspring_threshold
-offspring_threshold
-1
-10
-2.0
-0.1
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -696,17 +483,6 @@ NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <timeLimit steps="200"/>
-    <metric>count turtles</metric>
-    <steppedValueSet variable="offspring_threshold" first="2" step="2" last="10"/>
-    <steppedValueSet variable="grow_back_rate" first="1" step="1" last="5"/>
-    <steppedValueSet variable="max_food_consumed" first="5" step="1" last="15"/>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
